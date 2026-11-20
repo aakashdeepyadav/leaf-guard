@@ -22,7 +22,8 @@ frontend, a Streamlit demo, and Docker deployment.
 - Python **3.11** is recommended for the TensorFlow environment.
 - Node.js 20+ and npm are required for the Next.js frontend.
 - PlantVillage is downloaded automatically by TFDS on the first TFDS run.
-- A trained model and `models/class_names.json` are required for inference.
+- Trained model artifacts and `models/class_names.json` are required for
+  inference. They are generated locally and are intentionally not committed.
 
 ## Installation
 
@@ -33,8 +34,62 @@ python -m pip install --upgrade pip
 pip install -r requirements.txt
 ```
 
-The API dependencies are included in `requirements.txt`. They can also be
-installed separately with `pip install -r api/requirements.txt`.
+The API dependencies are included in `requirements.txt`. The equivalent API
+install command is `pip install -r api/requirements.txt`. For the smaller
+Streamlit-only image, use `pip install -r requirements-app.txt`.
+
+Install the frontend dependencies separately:
+
+```powershell
+cd frontend
+npm ci
+cd ..
+```
+
+## Quick start
+
+The interfaces cannot run until the model artifacts have been created. For a
+quick local check, train both classifiers and the autoencoder using a small
+subset of PlantVillage:
+
+```powershell
+python src/train_baseline.py --quick
+python src/train_transfer.py --quick
+python src/train_autoencoder.py --quick
+```
+
+Then choose one of the following interfaces:
+
+### Next.js + FastAPI
+
+Start the API from the project root:
+
+```powershell
+uvicorn api.main:app --reload --port 8000
+```
+
+In a second terminal, start the frontend:
+
+```powershell
+cd frontend
+copy .env.example .env.local
+npm run dev
+```
+
+Open [http://localhost:3000](http://localhost:3000). The frontend reads the
+API URL from `NEXT_PUBLIC_API_URL`, which defaults to
+`http://localhost:8000`.
+
+### Streamlit
+
+Start the standalone demo from the project root:
+
+```powershell
+streamlit run app/app.py
+```
+
+Open the URL printed by Streamlit, normally
+[http://localhost:8501](http://localhost:8501).
 
 ## Train the models
 
@@ -153,6 +208,19 @@ Example health check:
 curl http://localhost:8000/health
 ```
 
+Example prediction request:
+
+```powershell
+curl -X POST "http://localhost:8000/predict?model=mobilenet&confidence_threshold=0.6" `
+  -F "file=@path\to\leaf.jpg"
+```
+
+`model` accepts `mobilenet` or `baseline`. The `/predict` endpoint returns
+the predicted class, confidence, top-three probabilities, the original image,
+and a Grad-CAM overlay. If the optional autoencoder artifacts are present, it
+also rejects images that do not resemble leaves. `/attack` returns clean and
+FGSM predictions plus an adversarial image.
+
 Build the frontend for production:
 
 ```powershell
@@ -181,17 +249,20 @@ docker build -t leafguard .
 docker run --rm -p 8501:8501 leafguard
 ```
 
-The frontend has its own production container:
+The frontend has its own production container. Because
+`NEXT_PUBLIC_API_URL` is embedded during the Next.js build, create
+`frontend/.env.local` with the deployment API URL before building:
 
 ```powershell
 cd frontend
+copy .env.example .env.local
+# Edit .env.local if the API is not at http://localhost:8000
 docker build -t leafguard-frontend .
 docker run --rm -p 3000:3000 leafguard-frontend
 ```
 
-For Docker inference, train or copy the required files into `models/` before
-building. The frontend container expects the API at
-`NEXT_PUBLIC_API_URL`; configure it for the deployment environment.
+For Docker inference, train or copy the required model files into `models/`
+before building the Streamlit image.
 
 ## Project layout
 
