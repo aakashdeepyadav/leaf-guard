@@ -1,0 +1,15 @@
+tensorflow>=2.16,<2.21
+tensorflow-datasets>=4.9
+importlib-resources
+numpy
+pandas
+matplotlib
+scikit-learn
+opencv-python-headless
+pillow
+streamlit
+fastapi
+uvicorn[standard]
+python-multipart
+pytest
+tabulate
